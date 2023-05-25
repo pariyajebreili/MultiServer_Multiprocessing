@@ -9,7 +9,6 @@
 
 ## https://gist.github.com/berendiwema/1816201
 
-## https://codinghelp.io/creating-a-python-socket-server-with-multiple-clients/
 
 ## https://cppsecrets.com/users/136289711011711297109979711510511010310449545464103109971051084699111109/Python-Multiprocessing-Listeners-and-Clients.php
 
