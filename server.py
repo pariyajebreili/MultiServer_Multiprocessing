@@ -2,9 +2,10 @@ import socket
 import time
 import pickle
 import select
+from collections import deque
 
 
-HEADERSIZE = 10
+HEADERSIZE = 64
 IP = "127.0.0.1"
 PORT = 1234
 
@@ -13,7 +14,7 @@ server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 server_socket.bind((IP,PORT))
 
-server_socket.listen(5)
+server_socket.listen()
 
 sockets_list = [server_socket]
 
@@ -22,6 +23,8 @@ clients = {}
 # Flag to keep track of whether a client is connected or not
 client_connected = False
 
+# List to store waiting clients
+waiting_clients = deque()
 
 def receive_message(client_socket):
     try:
@@ -58,10 +61,10 @@ while True:
                 # Set client_connected flag to True
                 client_connected = True
             else:    
-                # If a client is already connected, reject new connections
+                # If a client is already connected, add the new client to waiting_clients list
                 client_socket, client_address = server_socket.accept()
-                client_socket.send("Another client is already connected. Please try again later.".encode("utf-8"))
-                client_socket.close()
+                waiting_clients.append(client_socket)
+                client_socket.send("Another client is already connected. Please wait for your turn.".encode("utf-8"))
 
         else:
             message = receive_message(notified_socket)
@@ -73,6 +76,15 @@ while True:
 
                 # Set client_connected flag to False
                 client_connected = False
+                
+                # Check if there are waiting clients, and connect the first one to the server
+                if waiting_clients:
+                    waiting_client_socket = waiting_clients.popleft()
+                    waiting_client_socket.send("You are now connected to the server.".encode("utf-8"))
+                    clients[waiting_client_socket] = {"header": b"", "data": b""}
+                    sockets_list.append(waiting_client_socket)
+                    client_connected = True
+                
                 continue
             user = clients[notified_socket]
             
@@ -89,3 +101,11 @@ while True:
 
         # Set client_connected flag to False
         client_connected = False
+        
+        # Check if there are waiting clients, and connect the first one to the server
+        if waiting_clients:
+            waiting_client_socket = waiting_clients.popleft()
+            waiting_client_socket.send("You are now connected to the server.".encode("utf-8"))
+            clients[waiting_client_socket] = {"header":b"", "data": b""}
+            sockets_list.append(waiting_client_socket)
+            client_connected = True
