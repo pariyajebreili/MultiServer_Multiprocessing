@@ -19,7 +19,8 @@ sockets_list = [server_socket]
 
 clients = {}
 
-
+# Flag to keep track of whether a client is connected or not
+client_connected = False
 
 
 def receive_message(client_socket):
@@ -41,17 +42,26 @@ def receive_message(client_socket):
 while True:
     read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
     for notified_socket in read_sockets : 
-        if notified_socket == server_socket:
-            client_socket, client_address = server_socket.accept()
+        if notified_socket== server_socket:
+            if not client_connected:
+                client_socket, client_address = server_socket.accept()
 
-            user = receive_message(client_socket)
+                user = receive_message(client_socket)
 
-            if user is False :
-                continue
-            sockets_list.append(client_socket)
+                if user is False :
+                    continue
+                sockets_list.append(client_socket)
 
-            clients[client_socket] = user
-            print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')}")
+                clients[client_socket] = user
+                print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')}")
+
+                # Set client_connected flag to True
+                client_connected = True
+            else:    
+                # If a client is already connected, reject new connections
+                client_socket, client_address = server_socket.accept()
+                client_socket.send("Another client is already connected. Please try again later.".encode("utf-8"))
+                client_socket.close()
 
         else:
             message = receive_message(notified_socket)
@@ -60,6 +70,9 @@ while True:
                 print(f"closed connection from {clients[notified_socket]['data'].decode('utf-8')}")
                 sockets_list.remove(notified_socket)
                 del clients[notified_socket]
+
+                # Set client_connected flag to False
+                client_connected = False
                 continue
             user = clients[notified_socket]
             
@@ -74,14 +87,5 @@ while True:
         sockets_list.remove(notified_socket)
         del clients[notified_socket]
 
-
-
-
-
-
-
-
-
-
-
-
+        # Set client_connected flag to False
+        client_connected = False
