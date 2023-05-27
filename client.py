@@ -7,20 +7,27 @@ import select
 HEADERSIZE = 64
 
 IP = "127.0.0.1"
-PORT = 1234
+PORTS = [8000, 8001, 8002, 8003, 8004]
 
 my_username = input("Username : ")
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-client_socket.connect((IP, PORT))
+#client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+#client_socket.connect((IP, PORT))
 #print(f"Connected to server at {IP}:{PORT}")
-client_socket.setblocking(False)
+#client_socket.setblocking(False)
+
+client_sockets = []
+for port in PORTS:
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((IP, port))
+    client_socket.setblocking(False)
+    client_sockets.append(client_socket)
 
 username = my_username.encode("utf-8")
 username_header = f"{len(username):<{HEADERSIZE}}".encode("utf-8")
 client_socket.send(username_header + username)
 
 while True:
-    sockets_list = [ client_socket]
+    sockets_list = [client_socket]
 
     read_sockets, write_socket, error_socket = select.select(sockets_list, [], [])
 
@@ -46,3 +53,4 @@ while True:
                 message = message.encode("utf-8")
                 message_header = f"{len(message):<{HEADERSIZE}}".encode("utf-8")
                 client_socket.send(message_header + message)
+    
