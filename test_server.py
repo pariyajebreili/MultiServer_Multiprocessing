@@ -47,6 +47,7 @@ def server(port):
         return False
 
 
+
     while True:
         read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
         for notified_socket in read_sockets : 
@@ -63,8 +64,12 @@ def server(port):
                         sockets_list.append(client_socket)
 
                         clients[client_socket] = user
+                        
                         print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{port}")
                         server["connected_clients"] += 1
+                        client_socket.send(f"You are connected to server on port".encode("utf-8"))
+                        start_time = time.time()
+                        #print(server["connected_clients"])
                         break
                     elif server["connected_clients"] < server["capacity"]:
                         # If the current serverContinuing from where we left off:has available capacity, accept the new client
@@ -78,22 +83,36 @@ def server(port):
 
                         clients[client_socket] = user
 
-                        print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')}port:{server['port']}")
+                        #print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')}port:{server['port']}")
                                   # Update the number of connected clients for the current server
                         server["connected_clients"] += 1
+                        
 
+                        # Encode the message and calculate its length
+                        message1 = "heelooo"
+                        username = message1.encode("utf-8")
+                        username_header = f"{len(username):<{HEADERSIZE}}".encode("utf-8")
+                        client_socket.send(username_header + username)
+
+
+                        #message = receive_message(client_socket)
+                        #port = message["port"]
+                        #message_data = message["data"]
+                        # Send a message to the client indicating which server it is connected to
+                        
+                        #client_socket.send(message["header"] + message_data.encode("utf-8"))
                         # Break out of the loop since we've connected to a server
                         break
                     else:
                         # If the current server is full, add the client to the waiting list
                         waiting_clients.append((client_socket, client_address))
-                        print(f"Client {client_address[0]}:{client_address[1]} is waiting for an available server")
+                        #print(f"Client {port}: is waiting for an available server")
 
                 # If we've gone through all the servers and haven't found an available one, wait for one to become available
                 if len(waiting_clients) > 0:
-                    print("All servers are full, waiting for an available one...")
+                    #print("All servers are full, waiting for an available one...")
                     # Wait for up to 10 seconds for a server to become available
-                    read_sockets, _, _ = select.select(sockets_list, [], [], 2)
+                    read_sockets, _, _ = select.select(sockets_list, [], [], 10)
 
                     for notified_socket in read_sockets:
                         random.shuffle(server_info)
@@ -110,8 +129,9 @@ def server(port):
                                 sockets_list.append(client_socket)
                                 clients[client_socket] = user
 
-                                print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{server['port']}")
+                                #print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{server['port']}")
                                 server["connected_clients"] += 1
+                                #print(server["connected_clients"])
                                 break
                         else:
                             # If no servers have available capacity, add the client to the waiting list
@@ -130,13 +150,23 @@ def server(port):
                     for server in server_info:
                         if server["port"] == port:
                             server["connected_clients"] -= 1
+                            end_time = time.time()
+                            duration = end_time - start_time
+                            print(f"Client {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{port} the duration : {duration}")
                             break
+
                 else:
                     # If the message is not False, broadcast it to all clients except the sender
                     for client_socket in clients:
                         if client_socket != notified_socket:
-                            client_socket.send(message["header"] + message["data"])
-    server_socket.close()
+                            message = receive_message(notified_socket)
+                            port = message["port"]
+                            message_data = message["data"]
+                            # Send a message to the client indicating which server it is connected to
+                            client_socket.send(f"You are connected to server on port {port}\n".encode("utf-8"))
+                            client_socket.send(message["header"] + message_data.encode("utf-8"))
+                            
+        #server_socket.close()
 
 
 if __name__ == '__main__':
