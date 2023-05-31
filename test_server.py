@@ -49,8 +49,8 @@ def server(port):
 
 
     while True:
-        read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
-        for notified_socket in read_sockets : 
+        #read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
+        for notified_socket in sockets_list : 
             if notified_socket== server_socket:
                 for server in reversed(server_info):
                     if server["port"] == port and server["connected_clients"] < server["capacity"]:
@@ -67,7 +67,7 @@ def server(port):
                         
                         print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{port}")
                         server["connected_clients"] += 1
-                        client_socket.send(f"You are connected to server on port".encode("utf-8"))
+                        #client_socket.send(f"You are connected to server on port:{port}".encode("utf-8"))
                         start_time = time.time()
                         #print(server["connected_clients"])
                         break
