@@ -13,7 +13,8 @@ MAX_CONNECTIONS = 1
 ports = [8000, 8001, 8002, 8003, 8004]
 
 # Create a list of dictionaries to store the number of connected clients and the availability of each server
-server_info = [{"port": port, "capacity": MAX_CONNECTIONS, "connected_clients": 0} for port in ports]
+server_info = [{"port": port, "capacity": MAX_CONNECTIONS, "connected_clients": 0, "start_time": None} for port in ports]
+#print(server_info)
 
 def server(port):
 
@@ -21,7 +22,7 @@ def server(port):
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     server_socket.bind((IP,port))
-
+    
     server_socket.listen()
 
     sockets_list = [server_socket]
@@ -55,7 +56,7 @@ def server(port):
                     if server["port"] == port and server["connected_clients"] < server["capacity"]:
                         # If the current server is the same as the server for this process and there is available capacity, accept the new client
                         client_socket, client_address = server_socket.accept()
-
+                        #print(server_info)
                         user = receive_message(client_socket)
 
                         if user is False :
@@ -63,9 +64,13 @@ def server(port):
                         sockets_list.append(client_socket)
 
                         clients[client_socket] = user
+
                         start_time = time.time()
+                        server["start_time"] = start_time
+                        
                         print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{port}")
                         server["connected_clients"] += 1
+                        
                         break
                     elif server["connected_clients"] < server["capacity"]:
                         # If the current serverContinuing from where we left off:has available capacity, accept the new client
@@ -82,13 +87,14 @@ def server(port):
                         print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')}port:{server['port']}")
                                   # Update the number of connected clients for the current server
                         server["connected_clients"] += 1
+                        
 
                         # Break out of the loop since we've connected to a server
                         break
                     else:
                         # If the current server is full, add the client to the waiting list
                         waiting_clients.append((client_socket, client_address))
-                        print(f"Client {client_address[0]}:{client_address[1]} is waiting for an available server")
+                        #print(f"Client {client_address[0]}:{client_address[1]} is waiting for an available server")
 
                 # If we've gone through all the servers and haven't found an available one, wait for one to become available
                 if len(waiting_clients) > 0:
@@ -113,6 +119,7 @@ def server(port):
 
                                 print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{server['port']}")
                                 server["connected_clients"] += 1
+                               
                                 break
                         else:
                             # If no servers have available capacity, add the client to the waiting list
@@ -130,15 +137,16 @@ def server(port):
                     # Find the server that the disconnected client was connected to and update the number of connected clients
                     for server in server_info:
                         if server["port"] == port:
-                            server["connected_clients"] -= 1
+                            server["connected_clients"] -= 1                           
                             end_time = time.time()
-                            duration = end_time - start_time
-                            print(f"Client {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{port} the duration : {duration}")
+                            duration = end_time - server["start_time"] # Use the start time stored in the server_info dictionary
+                            print(f"the duration : {duration}")
                             break
+                    
                 else:
                     # If the message is not False, broadcast it to all clients except the sender
                     for client_socket in clients:
-                        if client_socket != notified_socket:
+                        if client_socket == notified_socket:
                             client_socket.send(message["header"] + message["data"])
     server_socket.close()
 

@@ -19,7 +19,7 @@ client_sockets = []
 for port in PORTS:
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((IP, port))
-    client_socket.setblocking(False)
+    
     client_sockets.append(client_socket)
 
 username = my_username.encode("utf-8")
@@ -29,9 +29,10 @@ client_socket.send(username_header + username)
 while True:
     sockets_list = [client_socket]
 
-    read_sockets, write_socket, error_socket = select.select(sockets_list, [], [])
+    #read_sockets, write_socket, error_socket = select.select(sockets_list, [], [])
 
-    for socks in read_sockets:
+    for socks in sockets_list:
+        client_socket.setblocking(True)
         if socks == client_socket:
             message_header = client_socket.recv(HEADERSIZE)
             if not len(message_header):
