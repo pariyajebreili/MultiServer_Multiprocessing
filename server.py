@@ -1,3 +1,5 @@
+## best version
+
 import random
 import socket
 import time
@@ -9,20 +11,22 @@ HEADERSIZE = 64
 IP = "127.0.0.1"
 MAX_CONNECTIONS = 1
 
-# List of port numbers to use for each server
+#List of port numbers to use for each server
 ports = [8000, 8001, 8002, 8003, 8004]
 
-# Create a list of dictionaries to store the number of connected clients and the availability of each server
-server_info = [{"port": port, "capacity": MAX_CONNECTIONS, "connected_clients": 0, "start_time": None} for port in ports]
-#print(server_info)
+#Create a list of dictionaries to store the number of connected clients, the availability of each server, and whether the server is currently occupied
+server_info = [{"port": port, "capacity": MAX_CONNECTIONS, "connected_clients": 0, "occupied": False} for port in ports]
+
+#Create a list to track the current load of each server
+server_loads = [0] * len(ports)
+
 
 def server(port):
-
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
     server_socket.bind((IP,port))
-    
+
     server_socket.listen()
 
     sockets_list = [server_socket]
@@ -30,7 +34,7 @@ def server(port):
 
     clients = {}
 
-    # List to store waiting clients
+    # List tostore waiting clients
     waiting_clients = deque()
 
     def receive_message(client_socket):
@@ -47,108 +51,91 @@ def server(port):
             pass
         return False
 
-
     while True:
         read_sockets, _, exception_sockets = select.select(sockets_list, [], sockets_list)
-        for notified_socket in read_sockets : 
-            if notified_socket== server_socket:
-                for server in reversed(server_info):
-                    if server["port"] == port and server["connected_clients"] < server["capacity"]:
-                        # If the current server is the same as the server for this process and there is available capacity, accept the new client
+        for notified_socket in read_sockets:
+            if notified_socket == server_socket:
+                for server in server_info:
+                    if server["occupied"] == False:
+                        # If the current server is not occupied, accept the new client
                         client_socket, client_address = server_socket.accept()
-                        #print(server_info)
+
                         user = receive_message(client_socket)
 
-                        if user is False :
+                        if user is False:
                             continue
-                        sockets_list.append(client_socket)
 
+                        sockets_list.append(client_socket)
                         clients[client_socket] = user
 
+                        server["occupied"] = True
                         start_time = time.time()
-                        server["start_time"] = start_time
-                        
-                        print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{port}")
                         server["connected_clients"] += 1
-                        
+
+                        print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{server['port']}")
+
+                        # Send a messageto the client indicating which server it is connected to
+                        client_socket.send(f"You are connected to server on port {server['port']}\n".encode("utf-8"))
+
+                        # Add the client to the clients dictionary
+                        clients[client_socket] = {"user": user["data"].decode("utf-8"), "port": server['port']}
+
                         break
-                    elif server["connected_clients"] < server["capacity"]:
-                        # If the current serverContinuing from where we left off:has available capacity, accept the new client
-                        client_socket, client_address = server_socket.accept()
+                else:
+                    # If all servers are occupied, add the client to the waiting list
+                    client_socket, client_address = server_socket.accept()
 
-                        user = receive_message(client_socket)
+                    user = receive_message(client_socket)
 
-                        if user is False :
-                            continue
-                        sockets_list.append(client_socket)
+                    if user is False:
+                        continue
 
-                        clients[client_socket] = user
+                    sockets_list.append(client_socket)
+                    clients[client_socket] = user
 
-                        print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')}port:{server['port']}")
-                                  # Update the number of connected clients for the current server
-                        server["connected_clients"] += 1
-                        
+                    waiting_clients.append(client_socket) # Store the socket of the waiting client
 
-                        # Break out of the loop since we've connected to a server
-                        break
-                    else:
-                        # If the current server is full, add the client to the waiting list
-                        waiting_clients.append((client_socket, client_address))
-                        #print(f"Client {client_address[0]}:{client_address[1]} is waiting for an available server")
+                    print(f"Client {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} is waiting for an available server")
 
-                # If we've gone through all the servers and haven't found an available one, wait for one to become available
-                if len(waiting_clients) > 0:
-                    #print("All servers are full, waiting for an available one...")
-                    # Wait for up to 10 seconds for a server to become available
-                    read_sockets, _, _ = select.select(sockets_list, [], [], 2)
-
-                    for notified_socket in read_sockets:
-                        random.shuffle(server_info)
-                        for server in server_info:
-                            if server["connected_clients"] < server["capacity"]:
-                                # If the current server has available capacity, accept the new client
-                                client_socket, client_address = server_socket.accept()
-
-                                user =receive_message(client_socket)
-
-                                if user is False:
-                                    continue
-
-                                sockets_list.append(client_socket)
-                                clients[client_socket] = user
-
-                                print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{server['port']}")
-                                server["connected_clients"] += 1
-                               
-                                break
-                        else:
-                            # If no servers have available capacity, add the client to the waiting list
-                            waiting_clients.append((client_socket, client_address))
-                            #print(f"Client {client_address[0]}:{client_address[1]} is waiting for an available server")
             else:
-                # If the notified socket is not the server socket, receive andprocess the message from the client
+                # If the notified socket is not the server socket, it must be a client socket
                 message = receive_message(notified_socket)
 
-                # If the message is False, remove the client socket from the list of sockets and the dictionary of clients
                 if message is False:
+                    print(f"Closed connection from {clients[notified_socket]['user']} port:{clients[notified_socket]['port']}")
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    print(f"duration : {duration}")
+                    server = next(s for s in server_info if s['port'] == clients[notified_socket]['port'])
+                    server['occupied'] = False
+                    server['connected_clients'] -= 1
                     sockets_list.remove(notified_socket)
                     del clients[notified_socket]
 
-                    # Find the server that the disconnected client was connected to and update the number of connected clients
-                    for server in server_info:
-                        if server["port"] == port:
-                            server["connected_clients"] -= 1                           
-                            end_time = time.time()
-                            duration = end_time - server["start_time"] # Use the start time stored in the server_info dictionary
-                            print(f"the duration : {duration}")
-                            break
-                    
+                    # Check if there are any waiting clients
+                    if len(waiting_clients) > 0:
+                        # If there are waiting clients, accept the firstone and assign it to an available server
+                        waiting_client_socket = waiting_clients.popleft()
+                        server = next(s for s in server_info if s['occupied'] == False)
+                        server['occupied'] = True
+                        server['connected_clients'] += 1
+
+                        print(f"Accepted new connection from {client_address[0]}:{client_address[1]} username:{user['data'].decode('utf-8')} port:{server['port']}")
+
+                        # Send a messageto the client indicating which server it is connected to
+                        waiting_client_socket.send(f"You are connected to server on port {server['port']}\n".encode("utf-8"))
+
+                        # Add the client to the clients dictionary
+                        clients[waiting_client_socket] = {"user": user["data"].decode("utf-8"), "port": server['port']}
+
                 else:
-                    # If the message is not False, broadcast it to all clients except the sender
-                    for client_socket in clients:
-                        if client_socket == notified_socket:
-                            client_socket.send(message["header"] + message["data"])
-    server_socket.close()
+                    # If there are no waiting clients, close the connection
+                    print(f"Closed connection from {clients[notified_socket]['user']} port:{clients[notified_socket]['port']}")
+                    server = next(s for s in server_info if s['port'] == clients[notified_socket]['port'])
+                    server['occupied'] = False
+                    server['connected_clients'] -= 1
+                    sockets_list.remove(notified_socket)
+                    del clients[notified_socket]
 
 
 if __name__ == '__main__':
