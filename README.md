@@ -11,7 +11,7 @@ The client-server design pattern has been used.
 ## Installation
 1.
 ```bash
-git clone https://github.com/pariyajebreili/My_OS_project.git
+git clone https://github.com/pariyajebreili/MultiServer_Multiprocessing.git
 ```
 2.
 ```bash
